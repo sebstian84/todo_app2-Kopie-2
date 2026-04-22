@@ -17,6 +17,9 @@ const loginError = ref('')
 const notes = ref({})
 const archivedNotes = ref({})
 const todayKey = computed(() => new Date().toISOString().split('T')[0])
+const isSavingNotes = ref(false)
+const expandedPastNoteKeys = ref([]) // IDs of expanded past notes
+
 const workLogs = ref({}) // Date -> { accumulatedMs, isRunning, startTimeStamp, pause, start, end }
 const isSavingTime = ref(false)
 const elapsedTime = ref(0) // CURRENT session ms
@@ -1180,7 +1183,7 @@ const pinnedTodos = computed(() => {
             </div>
             <div class="pure-u-1 pure-u-md-1-4" style="padding-right: 1rem">
               <label>Zieldatum</label>
-              <input v-model="newTodo.targetDate" class="pure-u-1" type="date" />
+              <input v-model="newTodo.targetDate" class="pure-u-1" type="date" @input="(e) => e.target.blur()" />
             </div>
             <div class="pure-u-1 pure-u-md-1-4">
               <label>Tags</label>
@@ -1544,11 +1547,11 @@ const pinnedTodos = computed(() => {
           <div class="history-filters card slim">
              <div class="filter-group">
                 <label>Von</label>
-                <input type="date" v-model="timeFilter.from" />
+                <input type="date" v-model="timeFilter.from" @input="(e) => e.target.blur()" />
              </div>
              <div class="filter-group">
                 <label>Bis</label>
-                <input type="date" v-model="timeFilter.to" />
+                <input type="date" v-model="timeFilter.to" @input="(e) => e.target.blur()" />
              </div>
           </div>
 

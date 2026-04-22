@@ -40,12 +40,32 @@ Ein dediziertes Dashboard bietet einen Überblick über die eigene Produktivitä
 
 ### 3.5 Authentifizierung & Profilverwaltung
 - Sicherer Login zum Schutz der Daten.
+- Token-basierte Authentifizierung (Bearer Token).
 - Verwaltung von Benutzernamen und Passwörtern direkt in der App.
 
-### 3.6 Backup, Archiv & Historie
+### 3.6 Arbeitszeiterfassung (Time Tracking)
+- **Kumulativer Timer:** Unterstützung für mehrere Start/Stopp-Zyklen pro Tag. Die Zeit wird präzise aufsummiert (`accumulatedMs`).
+- **Live-Counter:** Echtzeitanzeige der aktuellen Arbeitszeit in der Detailansicht und minimiert in der Navigationsleiste.
+- **Wochen-Visualisierung:** Grafische Darstellung der Arbeitsstunden der letzten 8 Wochen mit Zielabgleich (Weekly Goal).
+- **Pausenmanagement:** Automatische Berücksichtigung von Pausenzeiten bei der Nettoberechnung.
+- **Export:** Export der Zeiterfassungsdaten als CSV-Datei für die Abrechnung.
+
+### 3.7 Notizen & Tagebuch
+- **Tagesnotizen:** Kalenderbasiertes Notizsystem zur Erfassung von Gedanken oder Protokollen pro Tag.
+- **Rich-Text Support:** Formatierung der Notizen mittels integriertem Editor.
+- **Volltextsuche:** Suche über alle vergangenen Notizen mit Treffer-Hervorhebung.
+- **Archivierung:** Notizen können archiviert werden, um die Übersicht zu wahren.
+
+### 3.8 Backup, Archiv & Historie
 - **Export/Import:** Vollständige Sicherung aller Daten (inkl. Archiv und Historie) als JSON-Datei.
 - **Archiv-Management:** Funktion zum endgültigen Leeren des gesamten Archivs in einem Schritt.
 - **Historie (Changelog):** Lückenlose Protokollierung aller Änderungen mit Detailansicht (Vorher/Nachher) und Undo-Funktionalität.
+- **Debug-Logging:** Backend-seitige Protokollierung (`debug.log`) zur Nachverfolgung von Synchronisationsvorgängen.
+
+### 3.9 Einstellungen (Settings)
+- **Personalisierung:** Konfiguration von Standard-Pausenzeiten und wöchentlichen Arbeitsstunden-Zielen.
+- **Ansichts-Optionen:** Umschalten zwischen Kompakt-Modus und Standard-Ansicht.
+- **Theme-Management:** Dark Mode / Light Mode Steuerung.
 
 ## 4. Datenmodell (Erweiterte Struktur)
 
@@ -58,8 +78,14 @@ Ein dediziertes Dashboard bietet einen Überblick über die eigene Produktivitä
   - `status`: 'offen' oder 'erledigt'.
   - `pinned`: Boolean (wahr/falsch).
   - `order`: Integer für Sortierung.
-- **Settings-Objekt:** Speichert UI-Zustände und Themes (z.B. Dark Mode Präferenz).
+- **Settings-Objekt:** Speichert UI-Zustände (Dark Mode), wöchentliche Ziele und Standardpausen.
 - **Changelog-Objekt:** Detaillierte Änderungshistorie für Audit-Trail und Undo.
+- **WorkLog-Objekt:**
+  - `accumulatedMs`: Summe der bereits abgeschlossenen Sitzungen des Tages.
+  - `startTimeStamp`: Beginn der aktuellen (laufenden) Sitzung.
+  - `isRunning`: Status-Flag.
+  - `pause`: Abzuziehende Pausenzeit in Minuten.
+- **Note-Objekt:** Mapping von Datumsschlüsseln auf HTML-Inhalte.
 
 ## 5. Qualitätssicherung
 - **Performance:** Die App ist auf Schnelligkeit optimiert (minimale Ladezeiten, flüssiges Scrollen).
