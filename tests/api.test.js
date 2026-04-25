@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://aufgaben.runasp.net/api/index.php';
-const TOKEN = 'todo_token_secure_frost0xx'; // Based on users.json and auth logic
+const API_URL = process.env.API_URL || 'https://aufgaben.runasp.net/api/index.php';
+let TOKEN = '';
 
 async function runTests() {
   console.log('🚀 Starting API Regression Tests...');
@@ -19,6 +19,16 @@ async function runTests() {
       failed++;
     }
   };
+
+  // Test 0: Login
+  await test('Login to obtain token', async () => {
+    const res = await axios.post(`${API_URL}/auth/login`, {
+      username: 'frost0xx',
+      password: '381984'
+    });
+    if (!res.data.token) throw new Error('Login failed: no token returned');
+    TOKEN = res.data.token;
+  });
 
   // Test 1: Fetch Todos
   await test('Fetch Todos (Authorized)', async () => {
@@ -68,6 +78,24 @@ async function runTests() {
       headers: { Authorization: `Bearer ${TOKEN}` }
     });
     if (resVerify.data[today] !== testContent) throw new Error('Note content mismatch after save');
+  });
+
+  // Test 5: Logout and verify invalidation
+  await test('Logout Invalidation', async () => {
+    // Logout
+    await axios.post(`${API_URL}/auth/logout`, {}, {
+      headers: { Authorization: `Bearer ${TOKEN}` }
+    });
+
+    // Verify token is now invalid
+    try {
+      await axios.get(`${API_URL}/data`, {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+      });
+      throw new Error('Token should be invalid after logout');
+    } catch (err) {
+      if (err.response?.status !== 401) throw err;
+    }
   });
 
   console.log('\n--- Summary ---');
