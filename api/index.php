@@ -11,7 +11,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $data_dir = __DIR__ . '/data/';
 $encryption_key = "todo_secret_key_32_chars_long_!!!";
-$auth_token_base = "todo_token_secure_";
 
 // Crypto Helpers
 function encrypt($data, $key) {
@@ -55,7 +54,8 @@ function write_secure_file($filename, $data) {
 function get_user_credentials() {
     $users = read_secure_file('users.json');
     if (!$users) {
-        $users = ['username' => 'frost0xx', 'password' => '381984'];
+        // Default credentials for initial setup
+        $users = ['username' => 'frost0xx', 'password' => '381984', 'token' => null];
         write_secure_file('users.json', $users);
     }
     return $users;
@@ -90,9 +90,11 @@ function get_auth_token() {
 }
 
 function is_authorized() {
-    global $auth_token_base;
     $creds = get_user_credentials();
-    return get_auth_token() === $auth_token_base . $creds['username'];
+    $token = get_auth_token();
+    if (!$token || !isset($creds['token']) || !$creds['token']) return false;
+    // Use hash_equals to prevent timing attacks
+    return hash_equals($creds['token'], $token);
 }
 
 // Logging
@@ -124,8 +126,29 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($path === '/auth/login' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $creds = get_user_credentials();
-    if ($input['username'] === $creds['username'] && $input['password'] === $creds['password']) {
-        $token = $auth_token_base . $creds['username'];
+    $username = isset($input['username']) ? $input['username'] : '';
+    $password = isset($input['password']) ? $input['password'] : '';
+
+    $authenticated = false;
+    if ($username === $creds['username']) {
+        // Password migration: check if it's already a hash or plaintext
+        if (strpos($creds['password'], '$2y$') === 0) {
+            $authenticated = password_verify($password, $creds['password']);
+        } else {
+            $authenticated = ($password === $creds['password']);
+            if ($authenticated) {
+                // Automatically upgrade to a secure hash on successful login
+                $creds['password'] = password_hash($password, PASSWORD_DEFAULT);
+            }
+        }
+    }
+
+    if ($authenticated) {
+        // Generate a cryptographically secure random token
+        $token = bin2hex(random_bytes(32));
+        $creds['token'] = $token;
+        write_secure_file('users.json', $creds);
+
         setcookie('todo_auth_token', $token, [
             'expires' => time() + (30 * 24 * 60 * 60),
             'path' => '/',
@@ -155,9 +178,15 @@ if (!is_authorized()) {
 if ($path === '/auth/update' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!empty($input['username']) && !empty($input['password'])) {
-        write_secure_file('users.json', ['username' => $input['username'], 'password' => $input['password']]);
-        // Update cookie with new token
-        $token = $auth_token_base . $input['username'];
+        // Generate new token and hash password
+        $token = bin2hex(random_bytes(32));
+        $new_creds = [
+            'username' => $input['username'],
+            'password' => password_hash($input['password'], PASSWORD_DEFAULT),
+            'token' => $token
+        ];
+        write_secure_file('users.json', $new_creds);
+
         setcookie('todo_auth_token', $token, [
             'expires' => time() + (30 * 24 * 60 * 60),
             'path' => '/',

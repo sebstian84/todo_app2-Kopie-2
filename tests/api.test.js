@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-const API_URL = 'https://aufgaben.runasp.net/api/index.php';
-const TOKEN = 'todo_token_secure_frost0xx'; // Based on users.json and auth logic
+const API_URL = process.env.API_URL || 'https://aufgaben.runasp.net/api/index.php';
+const USERNAME = 'frost0xx';
+const PASSWORD = '381984';
+let TOKEN = '';
 
 async function runTests() {
   console.log('🚀 Starting API Regression Tests...');
@@ -15,10 +17,20 @@ async function runTests() {
       passed++;
     } catch (err) {
       console.error(`❌ FAILED: ${name}`);
-      console.error(err.message);
+      console.error(err.response ? `${err.message} - ${JSON.stringify(err.response.data)}` : err.message);
       failed++;
     }
   };
+
+  // Step 0: Login to get dynamic token
+  await test('Login (Get Dynamic Token)', async () => {
+    const res = await axios.post(`${API_URL}/auth/login`, {
+      username: USERNAME,
+      password: PASSWORD
+    });
+    if (!res.data.token) throw new Error('Login failed, no token returned');
+    TOKEN = res.data.token;
+  });
 
   // Test 1: Fetch Todos
   await test('Fetch Todos (Authorized)', async () => {
@@ -55,7 +67,9 @@ async function runTests() {
     const resGet = await axios.get(`${API_URL}/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` }
     });
-    const notes = resGet.data || {};
+
+    // Explicitly handle empty response or array (should be object)
+    let notes = (resGet.data && typeof resGet.data === 'object' && !Array.isArray(resGet.data)) ? resGet.data : {};
     notes[today] = testContent;
 
     // Save
@@ -67,7 +81,11 @@ async function runTests() {
     const resVerify = await axios.get(`${API_URL}/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` }
     });
-    if (resVerify.data[today] !== testContent) throw new Error('Note content mismatch after save');
+
+    const verifyData = resVerify.data || {};
+    if (verifyData[today] !== testContent) {
+      throw new Error(`Note content mismatch after save. Expected "${testContent}", got "${verifyData[today]}"`);
+    }
   });
 
   console.log('\n--- Summary ---');
