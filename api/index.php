@@ -11,7 +11,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $data_dir = __DIR__ . '/data/';
 $encryption_key = "todo_secret_key_32_chars_long_!!!";
-$auth_token_base = "todo_token_secure_";
 
 // Crypto Helpers
 function encrypt($data, $key) {
@@ -90,9 +89,13 @@ function get_auth_token() {
 }
 
 function is_authorized() {
-    global $auth_token_base;
     $creds = get_user_credentials();
-    return get_auth_token() === $auth_token_base . $creds['username'];
+    $providedToken = get_auth_token();
+    if (!$providedToken || !isset($creds['token'])) {
+        return false;
+    }
+    // Use hash_equals to prevent timing attacks
+    return hash_equals($creds['token'], $providedToken);
 }
 
 // Logging
@@ -124,8 +127,33 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($path === '/auth/login' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $creds = get_user_credentials();
-    if ($input['username'] === $creds['username'] && $input['password'] === $creds['password']) {
-        $token = $auth_token_base . $creds['username'];
+
+    $password_matches = false;
+    $should_migrate = false;
+
+    // Check password (handle both plaintext migration and secure hash)
+    if ($input['username'] === $creds['username']) {
+        if (password_verify($input['password'], $creds['password'])) {
+            $password_matches = true;
+        } elseif ($input['password'] === $creds['password']) {
+            // Legacy plaintext match - trigger migration
+            $password_matches = true;
+            $should_migrate = true;
+        }
+    }
+
+    if ($password_matches) {
+        // Generate secure random token
+        $token = bin2hex(random_bytes(32));
+        $creds['token'] = $token;
+
+        // Upgrade plaintext password to hash if needed
+        if ($should_migrate) {
+            $creds['password'] = password_hash($input['password'], PASSWORD_DEFAULT);
+        }
+
+        write_secure_file('users.json', $creds);
+
         setcookie('todo_auth_token', $token, [
             'expires' => time() + (30 * 24 * 60 * 60),
             'path' => '/',
@@ -155,16 +183,24 @@ if (!is_authorized()) {
 if ($path === '/auth/update' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!empty($input['username']) && !empty($input['password'])) {
-        write_secure_file('users.json', ['username' => $input['username'], 'password' => $input['password']]);
+        // Generate secure random token and hash password
+        $token = bin2hex(random_bytes(32));
+        $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
+
+        write_secure_file('users.json', [
+            'username' => $input['username'],
+            'password' => $hashedPassword,
+            'token' => $token
+        ]);
+
         // Update cookie with new token
-        $token = $auth_token_base . $input['username'];
         setcookie('todo_auth_token', $token, [
             'expires' => time() + (30 * 24 * 60 * 60),
             'path' => '/',
             'samesite' => 'Lax',
             'httponly' => true
         ]);
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'token' => $token]);
     } else {
         http_response_code(400);
         echo json_encode(['message' => 'Username und Passwort erforderlich']);

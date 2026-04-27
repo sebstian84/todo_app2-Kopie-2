@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://aufgaben.runasp.net/api/index.php';
-const TOKEN = 'todo_token_secure_frost0xx'; // Based on users.json and auth logic
+const API_URL = process.env.API_URL || 'http://localhost:8000/api/index.php';
+let TOKEN = '';
 
 async function runTests() {
   console.log('🚀 Starting API Regression Tests...');
@@ -15,10 +15,20 @@ async function runTests() {
       passed++;
     } catch (err) {
       console.error(`❌ FAILED: ${name}`);
-      console.error(err.message);
+      console.error(err.response?.data || err.message);
       failed++;
     }
   };
+
+  // Test 0: Login to get dynamic token
+  await test('Login (Dynamic Token)', async () => {
+    const res = await axios.post(`${API_URL}/auth/login`, {
+      username: 'frost0xx',
+      password: '381984'
+    });
+    if (!res.data.token) throw new Error('Login failed to return token');
+    TOKEN = res.data.token;
+  });
 
   // Test 1: Fetch Todos
   await test('Fetch Todos (Authorized)', async () => {
@@ -55,7 +65,8 @@ async function runTests() {
     const resGet = await axios.get(`${API_URL}/notes`, {
       headers: { Authorization: `Bearer ${TOKEN}` }
     });
-    const notes = resGet.data || {};
+    let notes = resGet.data;
+    if (!notes || Array.isArray(notes)) notes = {};
     notes[today] = testContent;
 
     // Save
